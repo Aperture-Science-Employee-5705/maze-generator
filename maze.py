@@ -2,7 +2,7 @@ import ILib, random
 #need my PNG image writer to run
 
 
-#import numpy, cv2
+import numpy, cv2
 #these are only used for the fun debug thing
 #i could have used cv2 to write images too instead of my own library for that but whatever
 
@@ -49,10 +49,8 @@ class Maze:
         self.nodes = nodes
         self.size = len(nodes), len(nodes[0])
     def setStart(self, startx, starty):#add start position
-        assert self.nodes[startx][starty].draw, 'error! start point must be in drawn position on mask!'
         self.start = startx, starty
     def setEnd(self, endx, endy):#add end position
-        assert self.nodes[endx][endy].draw, 'error! start point must be in drawn position on mask!'
         self.end = endx, endy
     def __repr__(self):
         start = (self.start if self.start != None else '(undefined)')
@@ -96,11 +94,10 @@ def renderMaze(maze, wall=(0,)*3, space=(255,)*3, Start=(255, 0, 0), End=(0, 255
 #ILib.write(img, 'maze')
 #print(small)
 
-def generateMaze(width, height, interlinkProbablility=.0, maxInterlinks=-1, mask=None, startGenerationPoint=(0,0)):
+def generateMaze(width, height, interlinkProbablility=.0, maxInterlinks=-1, mask=None):
     '''generates a maze of height x width
        interlinkProbablility, a float between 0, 1 - determines the probability of genetrating interlinks that can form loops, normally 0.0 (should be kept low)
-       mask, a 2D array of 1's and 0's determining where the maze path should be generated (1 = generate, 0 = do not generate)
-       startGenerationPoint, the point at which the generator should start, useful for masks that obscure the normal start point (0,0)'''
+       mask, a 2D array of 1's and 0's determining where the maze path should be generated (1 = generate, 0 = do not generate)'''
     
     assert width  > 0 ,f'width must be greater than 0!\n not {width}!'
     assert height > 0 ,f'height must be greater than 0!\n not {height}!'
@@ -122,10 +119,14 @@ def generateMaze(width, height, interlinkProbablility=.0, maxInterlinks=-1, mask
                     maze[y][x].draw = False#also mark them to not be drawn
                     done += 1
 
-    if startGenerationPoint == None:
-        current = (0,0)#set start point
-    else:
-        current = startGenerationPoint
+    def findNextUnvisited():
+        for y, row in enumerate(mask):
+            for x, item in enumerate(row):#search through entire maze to find unvisited points
+                if not maze[y][x].visited:
+                    return y, x
+        return current
+
+    current = findNextUnvisited()#set start point
     
     backtracking = False
     interlinkCount = 0
@@ -139,8 +140,8 @@ def generateMaze(width, height, interlinkProbablility=.0, maxInterlinks=-1, mask
         #if backtracking:
         #    print(f'backtracking to {current}')
         #    M.setStart(current[1], current[0])
-        #cv2.imshow('maze generation debug', cv2.resize(numpy.array(renderMaze(M, (0.,)*3, pathCol, (0.0, 0.0, 1.0))), (width*25, height*25), interpolation=cv2.INTER_NEAREST))
-        #cv2.waitKey(12)
+        #cv2.imshow('maze generation debug', cv2.resize(numpy.array(renderMaze(M, (0.,)*3, pathCol, (0.0, 0.0, 1.0))), (width*20, height*20), interpolation=cv2.INTER_NEAREST))
+        #cv2.waitKey(5)
         
         avaliable = []
         avaliableInterlink = []
@@ -200,18 +201,31 @@ def generateMaze(width, height, interlinkProbablility=.0, maxInterlinks=-1, mask
             backtracking = False#if we were already backtracking - stop that
             done += 1
             current = new#move to new node
-        else:#if there were no avaliable moves - backtrack
-            prev = current
-            current = positions.pop()
-            backtracking = True
+        else:#if there were no avaliable moves - backtrack or find the next unvisited if possible
+            if positions.size() > 0:
+                prev = current
+                current = positions.pop()
+                backtracking = True
+            else:
+                new = findNextUnvisited()
+                if new == current:
+                    break
+                current = new
     return Maze(maze)
 
+def generateCircleMaze(radius=100, hollow=False, hollowThickness=10, interlinkProbablility=.0, maxInterlinks=5):
+    if not hollow:
+        mask = [[(1 if ((x-(radius-1))*(x-(radius-1)) + (y-(radius-1))*(y-(radius-1)))**0.5 <= radius else 0) for x in range(radius*2)] for y in range(radius*2)]
+    else:
+        mask = [[(1 if ((((x-(radius-1))*(x-(radius-1)) + (y-(radius-1))*(y-(radius-1)))**0.5 <= radius) and not (((x-(radius-1))*(x-(radius-1)) + (y-(radius-1))*(y-(radius-1)))**0.5 <= radius-hollowThickness)) else 0) for x in range(radius*2)] for y in range(radius*2)]
+    return generateMaze(radius*2, radius*2, interlinkProbablility, maxInterlinks, mask)
+
 if __name__ == '__main__':#if being run directly and not imported
-    mask = [[(1 if ((x-999)*(x-999) + (y-999)*(y-999))**0.5 <= 1000 else 0) for x in range(2000)] for y in range(2000)]
+    #mask = [[(1 if (x < 20 and x > 10) or (x < 40 and x > 30) else 0) for x in  range(50)] for y in range(50)]
     
-    m = generateMaze(2000, 2000, 0.15, 5, mask, (1000,1000))
-    m.setStart(175,100)
-    m.setEnd(999,999)
+    m = generateCircleMaze(100, True, 60)#Maze(50, 50, 0.15, 5, mask)
+    m.setStart(99,0)
+    m.setEnd(99,199)
 
     img = renderMaze(m)
     ILib.write(img, 'maze')
