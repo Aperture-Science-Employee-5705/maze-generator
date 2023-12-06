@@ -2,8 +2,8 @@ import ILib, random
 #need my PNG image writer to run
 
 
-#import numpy, cv2
-#these are only used for the fun debug thing
+import numpy, cv2
+#these are only used for the fun debug thing and the threshold function
 #i could have used cv2 to write images too instead of my own library for that but whatever
 
 
@@ -244,12 +244,18 @@ def generateCircleMaze(radius=100, hollow=False, hollowThickness=10, interlinkPr
         mask = [[(1 if ((((x-(radius-1))*(x-(radius-1)) + (y-(radius-1))*(y-(radius-1)))**0.5 <= radius) and not (((x-(radius-1))*(x-(radius-1)) + (y-(radius-1))*(y-(radius-1)))**0.5 <= radius-hollowThickness)) else 0) for x in range(radius*2)] for y in range(radius*2)]
     return generateMaze(radius*2, radius*2, interlinkProbablility, maxInterlinks, mask, longRunProbability, longRunMinMax, maxLongRuns)
 
-if __name__ == '__main__':#if being run directly and not imported
-    mask = [[(1 if (x < 20 and x > 10) or (x < 40 and x > 30) else 0) for x in  range(50)] for y in range(50)]
+def mazeFromImage(img, interlinkProbablility=.0, maxInterlinks=5, longRunProbability=0.01, longRunMinMax=(10,20), maxLongRuns=-1):
+    timg = cv2.threshold(img, 0.5, 1.0, cv2.THRESH_BINARY)
+    mask = [[int(x[0]*255) for x in y] for y in timg[1]]
     
-    m = generateMaze(50, 50, 0.15, 5)#, mask)
-    m.setStart(24,0)
-    m.setEnd(24,49)
+    return generateMaze(timg[1].shape[0], timg[1].shape[1], interlinkProbablility, maxInterlinks, mask, longRunProbability, longRunMinMax, maxLongRuns)
+
+if __name__ == '__main__':#if being run directly and not imported
+    #mask = [[(1 if (x < 20 and x > 10) or (x < 40 and x > 30) else 0) for x in  range(50)] for y in range(50)]
+    
+    m = generateMaze(CircleMaze(500, True, 300, longRunProbability=0.005, longRunMinMax=(20, 150))#(50, 50, 0.15, 5)#, mask)
+    #m.setStart(199,0)
+    #m.setEnd(199,399)
 
     img = renderMaze(m)
     ILib.write(img, 'maze')
