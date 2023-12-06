@@ -2,7 +2,7 @@ import ILib, random
 #need my PNG image writer to run
 
 
-import numpy, cv2
+#import numpy, cv2
 #these are only used for the fun debug thing
 #i could have used cv2 to write images too instead of my own library for that but whatever
 
@@ -94,7 +94,7 @@ def renderMaze(maze, wall=(0,)*3, space=(255,)*3, Start=(255, 0, 0), End=(0, 255
 #ILib.write(img, 'maze')
 #print(small)
 
-def generateMaze(width, height, interlinkProbablility=.0, maxInterlinks=-1, mask=None):
+def generateMaze(width, height, interlinkProbablility=.0, maxInterlinks=-1, mask=None, longRunProbability=0.01, longRunMinMax=(10,20), maxLongRuns=-1):
     '''generates a maze of height x width
        interlinkProbablility, a float between 0, 1 - determines the probability of genetrating interlinks that can form loops, normally 0.0 (should be kept low)
        mask, a 2D array of 1's and 0's determining where the maze path should be generated (1 = generate, 0 = do not generate)'''
@@ -103,6 +103,8 @@ def generateMaze(width, height, interlinkProbablility=.0, maxInterlinks=-1, mask
     assert height > 0 ,f'height must be greater than 0!\n not {height}!'
 
     assert interlinkProbablility <= 1 and interlinkProbablility >= 0, 'the interlinkProbablility must be a float between 0, 1'
+    assert longRunProbability <= 1 and longRunProbability >= 0, 'the longRunProbability must be a float between 0, 1'
+    longRunMinMax = min(longRunMinMax), max(longRunMinMax)#ensure they are in order
     if mask != None:
         assert (len(mask) == height) and (len(mask[0]) == width), 'error! mask dimensions must be the same as maze'
 
@@ -120,7 +122,7 @@ def generateMaze(width, height, interlinkProbablility=.0, maxInterlinks=-1, mask
                     done += 1
 
     def findNextUnvisited():
-        for y, row in enumerate(mask):
+        for y, row in enumerate(maze):
             for x, item in enumerate(row):#search through entire maze to find unvisited points
                 if not maze[y][x].visited:
                     return y, x
@@ -130,18 +132,11 @@ def generateMaze(width, height, interlinkProbablility=.0, maxInterlinks=-1, mask
     
     backtracking = False
     interlinkCount = 0
+    LRcount = 0
+    LRsteps = 0
+    prevDirection = (0, 0)
+    
     while done != total:#while there are still nodes to link up to
-
-        
-        #       FUN DEBUG ANIMATION THINGY (NEEDS cv2, numpy)
-        #
-        #pathCol = ((1. ,)*3 if not backtracking else (0.0, 1.0, 1.0))
-        #M = Maze(maze)
-        #if backtracking:
-        #    print(f'backtracking to {current}')
-        #    M.setStart(current[1], current[0])
-        #cv2.imshow('maze generation debug', cv2.resize(numpy.array(renderMaze(M, (0.,)*3, pathCol, (0.0, 0.0, 1.0))), (width*20, height*20), interpolation=cv2.INTER_NEAREST))
-        #cv2.waitKey(5)
         
         avaliable = []
         avaliableInterlink = []
@@ -155,6 +150,19 @@ def generateMaze(width, height, interlinkProbablility=.0, maxInterlinks=-1, mask
                     avaliableInterlink.append([nx, ny])
                 continue
             avaliable += [[nx, ny],]#add the move to avaliable moves list
+
+        if random.uniform(0, 1) < longRunProbability and (LRcount < maxLongRuns or maxLongRuns == -1) and LRsteps == 0:
+            LRsteps = random.randint(longRunMinMax[0], longRunMinMax[1])#if a long run is started, set the step counter to a random number of moves in range
+            LRcount += 1#increase the long run count
+         
+        if LRsteps > 0:#if during a long run and the current move is valid
+            new = [prevDirection[0]+current[0], prevDirection[1]+current[1]]
+            if list(prevDirection) != (0, 0) and not backtracking and new in avaliable:
+                avaliable = [new,]#if the previous move is possible, ensure it repeats
+                LRsteps -= 1
+            elif random.randint(0,1) == 1:#50% chance of a long run cancelling on invalid
+                LRsteps = 0
+        
         if len(avaliableInterlink) > 0:
             link = random.choice(avaliableInterlink)#all of this is the same as the stuff below, check those comments down there instead
             move = link[0]-current[0], link[1]-current[1]
@@ -201,7 +209,9 @@ def generateMaze(width, height, interlinkProbablility=.0, maxInterlinks=-1, mask
             backtracking = False#if we were already backtracking - stop that
             done += 1
             current = new#move to new node
+            prevDirection = move
         else:#if there were no avaliable moves - backtrack or find the next unvisited if possible
+            prevDirection = (0, 0)#dont allow long runs directly after
             if positions.size() > 0:
                 prev = current
                 current = positions.pop()
@@ -211,21 +221,35 @@ def generateMaze(width, height, interlinkProbablility=.0, maxInterlinks=-1, mask
                 if new == current:
                     break
                 current = new
+
+        
+        #       FUN DEBUG ANIMATION THINGY (NEEDS cv2, numpy)
+        #
+        #pathCol = (((1.0, 1.0, 0.0) if LRsteps > 0 else (1. ,)*3) if not backtracking else (0.0, 1.0, 1.0))
+        #M = Maze(maze)
+        #if backtracking:
+        #    print(f'backtracking at {current}')
+        #    M.setStart(current[1], current[0])
+        #if LRsteps > 0:
+        #    print(f'long run #{LRcount+1} step : {LRsteps}')
+        #    M.setStart(current[1], current[0])
+        #cv2.imshow('maze generation debug', cv2.resize(numpy.array(renderMaze(M, (0.,)*3, pathCol, (0.0, 0.0, 1.0))), (width*20, height*20), interpolation=cv2.INTER_NEAREST))
+        #cv2.waitKey(2)
     return Maze(maze)
 
-def generateCircleMaze(radius=100, hollow=False, hollowThickness=10, interlinkProbablility=.0, maxInterlinks=5):
+def generateCircleMaze(radius=100, hollow=False, hollowThickness=10, interlinkProbablility=.0, maxInterlinks=5, longRunProbability=0.01, longRunMinMax=(10,20), maxLongRuns=-1):
     if not hollow:
         mask = [[(1 if ((x-(radius-1))*(x-(radius-1)) + (y-(radius-1))*(y-(radius-1)))**0.5 <= radius else 0) for x in range(radius*2)] for y in range(radius*2)]
     else:
         mask = [[(1 if ((((x-(radius-1))*(x-(radius-1)) + (y-(radius-1))*(y-(radius-1)))**0.5 <= radius) and not (((x-(radius-1))*(x-(radius-1)) + (y-(radius-1))*(y-(radius-1)))**0.5 <= radius-hollowThickness)) else 0) for x in range(radius*2)] for y in range(radius*2)]
-    return generateMaze(radius*2, radius*2, interlinkProbablility, maxInterlinks, mask)
+    return generateMaze(radius*2, radius*2, interlinkProbablility, maxInterlinks, mask, longRunProbability, longRunMinMax, maxLongRuns)
 
 if __name__ == '__main__':#if being run directly and not imported
-    #mask = [[(1 if (x < 20 and x > 10) or (x < 40 and x > 30) else 0) for x in  range(50)] for y in range(50)]
+    mask = [[(1 if (x < 20 and x > 10) or (x < 40 and x > 30) else 0) for x in  range(50)] for y in range(50)]
     
-    m = generateCircleMaze(100, True, 60)#Maze(50, 50, 0.15, 5, mask)
-    m.setStart(99,0)
-    m.setEnd(99,199)
+    m = generateMaze(50, 50, 0.15, 5)#, mask)
+    m.setStart(24,0)
+    m.setEnd(24,49)
 
     img = renderMaze(m)
     ILib.write(img, 'maze')
