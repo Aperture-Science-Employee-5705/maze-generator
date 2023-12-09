@@ -60,6 +60,10 @@ class Maze:
         return '\n'.join(['\t'.join([str(n) for n in y]) for y in self.nodes])#return all nodes (string format)
     
 def renderMaze(maze, wall=(0,)*3, space=(255,)*3, Start=(255, 0, 0), End=(0, 255, 0)):
+    '''renders the maze as an image in the format of a three dimensional array
+       renders the maze with thin paths
+       maze - maze object input
+       wall, space, Start, End - the colour pallet to be used in the image'''
     img = [[wall for x in range(maze.size[1]*3)] for y in range(maze.size[0]*3)]#generate blank image
     for row in maze.nodes:
         for Node in row:#loop over node array
@@ -82,6 +86,49 @@ def renderMaze(maze, wall=(0,)*3, space=(255,)*3, Start=(255, 0, 0), End=(0, 255
         img[start[1]*3+1][start[0]*3+1] = Start
     if end != None:
         img[end[1]*3+1][end[0]*3+1] = End
+    return img
+
+def renderMaze2(maze, wall=(0,)*3, space=(255,)*3, Start=(255, 0, 0), End=(0, 255, 0)):
+    '''renders the maze as an image in the format of a three dimensional array
+       renders the maze with thin walls and a thick path
+       maze - maze object input
+       wall, space, Start, End - the colour pallet to be used in the image'''
+    img = [[wall for x in range(maze.size[1]*5)] for y in range(maze.size[0]*5)]#generate blank image
+    for row in maze.nodes:
+        for Node in row:#loop over node array
+            if Node == None:
+                continue
+            if not Node.draw:
+                continue
+            xcoord, ycoord = Node.x*5 + 2, Node.y*5 + 2#get coords in image
+            for x in range(-1, 2):
+                for y in range(-1, 2):
+                    img[ycoord+y][xcoord+x] = space
+            if Node.n == 1:#link stuff up
+                img[ycoord + 1][xcoord - 2] = space
+                img[ycoord    ][xcoord - 2] = space
+                img[ycoord - 1][xcoord - 2] = space
+            if Node.s == 1:
+                img[ycoord + 1][xcoord + 2] = space
+                img[ycoord    ][xcoord + 2] = space
+                img[ycoord - 1][xcoord + 2] = space
+            if Node.e == 1:
+                img[ycoord + 2][xcoord + 1] = space
+                img[ycoord + 2][xcoord    ] = space
+                img[ycoord + 2][xcoord - 1] = space
+            if Node.w == 1:
+                img[ycoord - 2][xcoord + 1] = space
+                img[ycoord - 2][xcoord    ] = space
+                img[ycoord - 2][xcoord - 1] = space
+    start, end = maze.start, maze.end
+    if start != None:#add start and end pixel
+            for x in range(-1, 2):
+                for y in range(-1, 2):
+                    img[start[1]*5+2+y][start[0]*5+2+x] = Start
+    if end != None:
+            for x in range(-1, 2):
+                for y in range(-1, 2):
+                    img[end[1]*5+2+y][end[0]*5+2+x] = End
     return img
 
 #small = Maze([[node(0,  0, 0, -1,  1,  4, -1), node(1,  1, 0, -1,  2,  5,  0), node(2,  2, 0, -1,  1, -1,  1), node(3,  3, 0, -1, -1,  1,  1)],
@@ -244,22 +291,23 @@ def generateCircleMaze(radius=100, hollow=False, hollowThickness=10, interlinkPr
         mask = [[(1 if ((((x-(radius-1))*(x-(radius-1)) + (y-(radius-1))*(y-(radius-1)))**0.5 <= radius) and not (((x-(radius-1))*(x-(radius-1)) + (y-(radius-1))*(y-(radius-1)))**0.5 <= radius-hollowThickness)) else 0) for x in range(radius*2)] for y in range(radius*2)]
     return generateMaze(radius*2, radius*2, interlinkProbablility, maxInterlinks, mask, longRunProbability, longRunMinMax, maxLongRuns)
 
-def mazeFromImage(img, interlinkProbablility=.0, maxInterlinks=5, longRunProbability=0.01, longRunMinMax=(10,20), maxLongRuns=-1):
-    timg = cv2.threshold(img, 0.5, 1.0, cv2.THRESH_BINARY)
+def mazeFromImage(img, binaryThreshold=128, interlinkProbablility=.0, maxInterlinks=5, longRunProbability=0.01, longRunMinMax=(10,20), maxLongRuns=-1):
+    timg = cv2.threshold(img, binaryThreshold, 255, cv2.THRESH_BINARY)
     mask = [[int(x[0]*255) for x in y] for y in timg[1]]
     
-    return generateMaze(timg[1].shape[0], timg[1].shape[1], interlinkProbablility, maxInterlinks, mask, longRunProbability, longRunMinMax, maxLongRuns)
+    return generateMaze(timg[1].shape[1], timg[1].shape[0], interlinkProbablility, maxInterlinks, mask, longRunProbability, longRunMinMax, maxLongRuns)
 
-if __name__ == '__main__':#if being run directly and not imported
+if __name__ == "__main__":#if being run directly and not imported
     #mask = [[(1 if (x < 20 and x > 10) or (x < 40 and x > 30) else 0) for x in  range(50)] for y in range(50)]
     
-    m = generateMaze(CircleMaze(500, True, 300, longRunProbability=0.005, longRunMinMax=(20, 150))#(50, 50, 0.15, 5)#, mask)
-    #m.setStart(199,0)
-    #m.setEnd(199,399)
-
-    img = renderMaze(m)
+    m = generateMaze(200, 200, 0.05)#CircleMaze(100, True, 90, longRunProbability=0.005, longRunMinMax=(20, 150))#(50, 50, 0.15, 5)#, mask)
+    m.setStart(99,0)
+    m.setEnd(9,199)
+    
+    img = renderMaze2(m)
     ILib.write(img, 'maze')
-
+    img = renderMaze(m)
+    ILib.write(img, 'maze - thin')
 
 
 
