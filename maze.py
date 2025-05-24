@@ -2,9 +2,9 @@ import ILib, random
 #need my PNG image writer to run
 
 
-import numpy, cv2
-#these are only used for the fun debug thing and the threshold function
-#i could have used cv2 to write images too instead of my own library for that but whatever
+#import numpy, cv2
+##these are only used for the fun debug thing and the threshold function
+##i could have used cv2 to write images too instead of my own library for that but whatever
 
 
 class stack:# a stack
@@ -291,7 +291,7 @@ def generateCircleMaze(radius=100, hollow=False, hollowThickness=10, interlinkPr
         mask = [[(1 if ((((x-(radius-1))*(x-(radius-1)) + (y-(radius-1))*(y-(radius-1)))**0.5 <= radius) and not (((x-(radius-1))*(x-(radius-1)) + (y-(radius-1))*(y-(radius-1)))**0.5 <= radius-hollowThickness)) else 0) for x in range(radius*2)] for y in range(radius*2)]
     return generateMaze(radius*2, radius*2, interlinkProbablility, maxInterlinks, mask, longRunProbability, longRunMinMax, maxLongRuns)
 
-def mazeFromImage(img, binaryThreshold=128, interlinkProbablility=.0, maxInterlinks=5, longRunProbability=0.01, longRunMinMax=(10,20), maxLongRuns=-1):
+def mazeFromImage(img, binaryThreshold=128, interlinkProbablility=.0, maxInterlinks=5, longRunProbability=0.01, longRunMinMax=(10,20), maxLongRuns=-1):#needs cv2 for the moment
     timg = cv2.threshold(img, binaryThreshold, 255, cv2.THRESH_BINARY)
     mask = [[int(x[0]*255) for x in y] for y in timg[1]]
     
